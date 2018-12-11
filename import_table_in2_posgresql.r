@@ -36,8 +36,10 @@ myshell <- function(mycmd,myinvisible=TRUE) {
 
 
 psql_import_table <- function(file="testAmphi2.csv",
-                              vecSep=c("\t",";",","),
+                              vecSep=c("\t",";",","),rawEncoding="UTF-8",
                               pathData="rawData",pathSQL= "sql",
+                              doChangeChar=TRUE,
+                              changeCharInRaw=list(c("\\\\\\\\\"\"",""),c("\\\",\\\"",";"),c(","," "),c("\"\"",""),c("\'\'"," "),c("/"," "),c("%",""),c(";",",")),
                               changeColNames=c("collaborative_australian_protected_areas_database__capad__marine_2010"="capad__marine_2010",
                                                "collaborative_australian_protected_areas_database__capad__marine_2010_1"="capad__marine_2010_1"),
                               excludedColumn=NULL,#"taxon_identification_issue",
@@ -61,17 +63,15 @@ psql_import_table <- function(file="testAmphi2.csv",
     ## -------------------------------------------------------
 
 
-    cat("\n Table importation in psql database\n======================================\n\n")
-
-    cat("Summary:\n-------------\n\n")
-
-
-
     fileSQL.path <- paste(pathSQL,"/",fileSQL,sep="")
 
     if(is.null(pathData)) pathDataFull <- paste(getwd()) else pathDataFull <- paste(getwd(),"/",pathData,"/",sep="")
 
     pathFile <- paste(pathDataFull,file,sep="")
+
+    cat("\n Table importation in psql database\n======================================\n\n")
+
+        cat("Summary:\n-------------\n\n")
 
     cat(" psql   [",tableName,"] <- ",pathFile,"\n",sep="")
 
@@ -80,9 +80,11 @@ psql_import_table <- function(file="testAmphi2.csv",
     while(flag){
         i <- i+1
         theSeparator <- vecSep[i]
-        d <- read.delim(pathFile, nrows = 2,sep=theSeparator,header=TRUE)
+        cat(" ## ",theSeparator," ## ")
+        d <- read.delim(pathFile, nrows = 2,sep=theSeparator,header=TRUE,encoding=rawEncoding,skipNul=TRUE)
         flag <- ncol(d)<2
     }
+
     h <- colnames(d)
     h <- tolower(h)
 
@@ -91,6 +93,21 @@ psql_import_table <- function(file="testAmphi2.csv",
 
     cat("\n",length(h),"columns detected with the separator:",theSeparator,"\n\n")
 
+
+
+    if(doChangeChar) {
+        cat("Change some character directly into raw file:\n------------------------------------\n\n")
+    for(i in 1:length(changeCharInRaw)) {
+        vchange <- changeCharInRaw[[i]]
+
+        cat("   change:",vchange[1],"->",vchange[2],"\n")
+
+        cmd <- paste("powershell -Command \"(gc ",pathFile,") -replace '",vchange[1],"', '",vchange[2],"' | Out-File ",pathFile,"\"",sep="")
+        myshell(cmd)
+    }
+
+
+    }
 
     cat("\nFixing some pb in data header:\n----------------------\n\n")
 
@@ -170,10 +187,10 @@ psql_import_table <- function(file="testAmphi2.csv",
     cat("   SQL file:",fileSQL.path,"\n\n")
 
 
-#    if(nchar(create)>1000) cat(substr(create,1,500),"\n[...CREATE query to long to be enterely showed...]\n",substr(create,nchar(create)-50,nchar(create)),"\n") else cat(create,"\n")
+    if(nchar(create)>1000) cat(substr(create,1,500),"\n[...CREATE query to long to be enterely showed...]\n",substr(create,nchar(create)-50,nchar(create)),"\n") else cat(create,"\n")
     cat(create,file=fileSQL.path,append=TRUE)
 
-    copyQuery <- paste("\n\n\ \\copy ",tableName,ifelse(!is.null(excludedColumn),paste("(",paste(h,collapse=","),")",sep=""),"")," FROM '",pathFile,"' with (format csv, header, delimiter '",theSeparator,"', ESCAPE ',', null '',ENCODING 'UTF-8')\n",sep="")#,ESCAPE '\"'
+    copyQuery <- paste("\n\n\ \\copy ",tableName,ifelse(!is.null(excludedColumn),paste("(",paste(h,collapse=","),")",sep=""),"")," FROM '",pathFile,"' with (format csv, header, delimiter '",theSeparator,"', ESCAPE ',', null '')\n",sep="")#,ESCAPE '\"',ENCODING '",rawEncoding,"
     cat(copyQuery)
     cat(copyQuery,file=fileSQL.path,append=TRUE)
 
