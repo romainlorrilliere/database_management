@@ -46,7 +46,9 @@ psql_import_table <- function(file="testAmphi2.csv",
                               fileSQL= "_postgres_import_data.sql",
                               db.name="harmony",db.user="postgres",
                               tableName="amphibians",pkField="record_id",
-                              realField=c("decimallatitude","decimallongitude"),intField=NULL,booleanField=NULL,
+                              specificVarCharField="",
+                              realField=c("decimallatitude","decimallongitude"),
+                              intField=NULL,booleanField=NULL,
                               toDoLiteTable=FALSE,litetableName="alalite",
                               keepedCol=NULL,litetableColType=c("f"="varchar(20)","e"="real"),
                               vecIndex=NULL,
@@ -75,24 +77,22 @@ psql_import_table <- function(file="testAmphi2.csv",
         cat("\nChange some character directly into raw file:\n--------------------------------------------\n\n")
         is.windows <- Sys.info()["sysname"] == "Windows"
         if(is.windows) {
-    for(i in 1:length(changeCharInRaw)) {
-        vchange <- changeCharInRaw[[i]]
+            for(i in 1:length(changeCharInRaw)) {
+                vchange <- changeCharInRaw[[i]]
 
-        cat("   change:",vchange[1],"->",vchange[2],"\n")
+                cat("   change:",vchange[1],"->",vchange[2],"\n")
 
-        cmd <- paste("powershell -Command \"(gc ",pathFile,") -replace '",vchange[1],"', '",vchange[2],"' | Out-File ",pathFile," -encoding 'ASCII'\"",sep="")
-        myshell(cmd)
+                cmd <- paste("powershell -Command \"(gc ",pathFile,") -replace '",
+                             vchange[1],"', '",vchange[2],"' | Out-File ",
+                             pathFile," -encoding 'ASCII'\"",sep="")
+                myshell(cmd)
     }
         } else {
             stop("!!! This procedure has not yet done for UNIX OS :'-( !!!\n")
         }
+   }
 
-
-
-    }
-
-
-        cat("\nSummary:\n-------------\n\n")
+    cat("\nSummary:\n-------------\n\n")
 
     cat(" psql   [",tableName,"] <- ",pathFile,"\n",sep="")
 
@@ -101,7 +101,8 @@ psql_import_table <- function(file="testAmphi2.csv",
     while(flag){
         i <- i+1
         theSeparator <- vecSep[i]
-        d <- read.delim(pathFile, nrows = 2,sep=theSeparator,header=TRUE,encoding=rawEncoding,skipNul=FALSE)
+        d <- read.delim(pathFile, nrows = 2,sep=theSeparator,
+                        header=TRUE,encoding=rawEncoding,skipNul=FALSE)
         flag <- ncol(d)<2
     }
 
@@ -177,9 +178,9 @@ psql_import_table <- function(file="testAmphi2.csv",
 
 
     field <- paste(paste(h,ifelse(h %in% realField," real",
-                     ifelse(h %in% intField," int",
-                     ifelse(h %in% booleanField," boolean"," varchar(250)"))),
-                    ifelse(h %in% pkField," primary key",""),",\n",sep=""),
+                           ifelse(h %in% intField," int",
+                           ifelse(h %in% booleanField," boolean"," varchar"))),
+                         ifelse(h %in% pkField," primary key",""),",\n",sep=""),
                    collapse="")
     field <- substr(field,1,nchar(field)-2)
 
