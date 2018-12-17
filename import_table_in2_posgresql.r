@@ -38,7 +38,7 @@ myshell <- function(mycmd,myinvisible=TRUE) {
 psql_import_table <- function(file="testAmphi2.csv",
                               vecSep=c("\t",";",","),rawEncoding="UTF-8",
                               pathData="rawData",pathSQL= "sql",
-                              doChangeChar=TRUE,
+                              doChangeChar=FALSE,
                               changeCharInRaw=list(c("\\\\\\\\\"\"",""),c("\\\",\\\"","\\\";\\\""),c(","," "),c("\"\"","")),#c(","," "),c("\"\"",""),,c("\'\'"," ")
                               changeColNames=c("collaborative_australian_protected_areas_database__capad__marine_2010"="capad__marine_2010",
                                                "collaborative_australian_protected_areas_database__capad__marine_2010_1"="capad__marine_2010_1"),
