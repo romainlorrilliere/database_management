@@ -43,14 +43,14 @@ psql_import_table <- function(file="testAmphi2.csv",
                               changeColNames=c("collaborative_australian_protected_areas_database__capad__marine_2010"="capad__marine_2010",
                                                "collaborative_australian_protected_areas_database__capad__marine_2010_1"="capad__marine_2010_1"),
                               excludedColumn=NULL,#"taxon_identification_issue",
-                        fileSQL= "_postgres_import_data.sql",
-                        db.name="harmony",db.user="postgres",
-                        tableName="amphibians",pkField="record_id",
-                        realField=c("decimallatitude","decimallongitude"),intField=NULL,booleanField=NULL,
-                        toDoLiteTable=FALSE,litetableName="alalite",
-                        keepedCol=NULL,litetableColType=c("f"="varchar(20)","e"="real"),
-                        vecIndex=NULL,
-                        createGeom=FALSE,geomName=NULL,epsgRaw="4326",epsgGeom=NULL,geom.lonlat=c("decimallongitude","decimallatitude")) {
+                              fileSQL= "_postgres_import_data.sql",
+                              db.name="harmony",db.user="postgres",
+                              tableName="amphibians",pkField="record_id",
+                              realField=c("decimallatitude","decimallongitude"),intField=NULL,booleanField=NULL,
+                              toDoLiteTable=FALSE,litetableName="alalite",
+                              keepedCol=NULL,litetableColType=c("f"="varchar(20)","e"="real"),
+                              vecIndex=NULL,
+                              createGeom=FALSE,geomName=NULL,epsgRaw="4326",epsgGeom=NULL,geom.lonlat=c("decimallongitude","decimallatitude")) {
 
 
     ## ---- initializing parameters for debugging ----
