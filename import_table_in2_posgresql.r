@@ -45,7 +45,7 @@ myshell <- function(mycmd,myinvisible=TRUE) {
 
 
 
-#' Title
+#' Bind importation of a huge file in postgres
 #'
 #' @param file the raw data file name
 #' @param vecSep a vector of probable separator. In defaut the script test successively \t ; ,
@@ -269,7 +269,7 @@ psql_import_table <- function(file,
         if(is.null(epsgGeom)) epsgGeom <- epsgRaw
         if(is.null(geomName)) geomName <- paste("geom",epsgGeom,sep="")
 
-        query <- paste("\nALTER TABLE ",ifelse(toDoLiteTable,litetableName,tableName)," ADD COLUMN ",geomName," geometry(Point,",epsgGeom,");\nUPDATE ",ifelse(toDoLiteTable,litetableName,tableName),"\nSET ",geomName," = ",ifelse(epsgRaw!=epsgGeom,"ST_Transform(",""),"ST_SetSRID(ST_MakePoint(", geom.lonlat[1],",", geom.lonlat[2],"),",epsgRaw,")",ifelse(epsgRaw!=epsgGeom,",2154)",""),";\n",sep="")
+        query <- paste("\nALTER TABLE ",ifelse(toDoLiteTable,litetableName,tableName)," ADD COLUMN ",geomName," geometry(Point,",epsgGeom,");\nUPDATE ",ifelse(toDoLiteTable,litetableName,tableName),"\nSET ",geomName," = ",ifelse(epsgRaw!=epsgGeom,"ST_Transform(",""),"ST_SetSRID(ST_MakePoint(", geom.lonlat[1],",", geom.lonlat[2],"),",epsgRaw,")",ifelse(epsgRaw!=epsgGeom,paste(",",epsgGeom,")",sep=""),""),";\n",sep="")
         cat(query)
         cat(query,file=fileSQL.path,append=TRUE)
     }
@@ -368,6 +368,7 @@ psql_posgis_init <- function(con=NULL,dbname,user=NULL,password=NULL) {
 #' @param dbname  for the name of the database on the host
 #' @param user for the user name (default: current user), in windows OS you probably have to define the user
 #' @param password for the password
+#' @param ogrinfo option of ogr2ogr function defaut value FALSE
 #'
 #' @return NULL
 #'
@@ -377,9 +378,9 @@ psql_posgis_init <- function(con=NULL,dbname,user=NULL,password=NULL) {
 psql_import_ogr <- function(pathFile,epsg="4326",
                             dbname="",user="",password="",
                             pgis.tableName="",
-                            host="localhost") {
+                            host="localhost",ogrinfo=FALSE) {
 
-    cmd <- paste("ogr2ogr -f PostgreSQL -t_srs EPSG:",epsg," PG:\"host=",host," port=5432 dbname=",dbname," user=",user," password=",password,"\" ",pathFile," -nln public.",dbname," -nlt MULTIPOLYGON -overwrite -progress -unsetFid --config PG_USE_COPY YES",sep="")
+    cmd <- paste("ogr2ogr -f PostgreSQL -t_srs EPSG:",epsg," PG:\"host=",host," port=5432 dbname=",dbname," user=",user," password=",password,"\" ",pathFile," -nln public.",dbname," -nlt MULTIPOLYGON -overwrite -progress -unsetFid --config PG_USE_COPY YES ",ifelse(ogrinfo,"ogrinfo --formats",""),"",sep="")
     myshell(cmd)
 
 }
@@ -460,4 +461,43 @@ psql_import_shp_by_sql <- function(pathFile,
 
 }
 
+
+
+
+
+
+
+#' Add geometry on table of point
+#'
+#' @param dbname  for the name of the database on the host
+#' @param user for the user name (default: current user), in windows OS you probably have to define the user
+#' @param tableName for the table name that will be created
+#' @param geomName the geom name by defaut paste("geom",epsgGeom,sep=""
+#' @param epsgRaw the epsg of input data
+#' @param epsgGeom the epsg of geom by defaut epsgRaw
+#' @param geom.lonlat vector of the name of field to construct the geom default c("longitude","latitude")
+#'
+#' @return NULL
+#' @export
+#'
+#' @examples psql_add_geom(dbname="harmony",tableName="amphibians",geom.lonlat=c("decimallongitude","decimallatitude"))
+psql_add_geom <- function(    dbname=NULL,user="postgres",tableName,
+                              geomName=paste("geom",epsgGeom,sep=""),
+                              epsgRaw="4326",epsgGeom=epsgRaw,
+                              geom.lonlat=c("longitude","latitude")) {
+
+
+    ## ---- initializing of an example set of parameters for debugging ----
+    ## geomName=NULL;epsgRaw="4326";epsgGeom=NULL;geom.lonlat=c("lon","lat")
+    ## tableName="foo";dbname="bullshit"
+    ## -------------------------------------------------------
+
+
+        if(is.null(epsgGeom)) epsgGeom <- epsgRaw
+        if(is.null(geomName)) geomName <- paste("geom",epsgGeom,sep="")
+
+        query <- paste("\nALTER TABLE ",tableName," ADD COLUMN ",geomName," geometry(Point,",epsgGeom,");\nUPDATE ",tableName,"\nSET ",geomName," = ",ifelse(epsgRaw!=epsgGeom,"ST_Transform(",""),"ST_SetSRID(ST_MakePoint(", geom.lonlat[1],",", geom.lonlat[2],"),",epsgRaw,")",ifelse(epsgRaw!=epsgGeom,paste(",",epsgGeom,")",sep=""),""),";\n",sep="")
+        cat(query)
+        cat(query,file=fileSQL.path,append=TRUE)
+    }
 
