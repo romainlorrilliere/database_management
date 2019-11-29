@@ -501,3 +501,278 @@ psql_add_geom <- function(    dbname=NULL,user="postgres",tableName,
         cat(query,file=fileSQL.path,append=TRUE)
     }
 
+
+
+
+
+get_oso_data <- function(rep = NULL,vec_dep=NULL,year=2017) {
+
+    ## ---- initializing parameters for debugging ----
+    ## rep=NULL;vec_dep=NULL
+    ## ---
+
+
+    if(is.null(rep)) rep <- paste(getwd(),"/data/oso",year,sep="")
+
+    if(!(rep %in% dir("data/")))
+        dir.create(paste(rep,"/",sep=""),showWarnings=FALSE)
+
+
+    if(is.null(vec_dep)) {
+        tabDep <- read.csv2("data/departement.csv",encoding = "latin1")
+        vec_dep <- tabDep[,1]
+    }
+
+    for(dep in vec_dep) {
+        cat("departement:",dep,"\n")
+        url <- paste("http://osr-cesbio.ups-tlse.fr/echangeswww/TheiaOSO/vecteurs_",year,"/departement_",dep,".zip", sep="")
+        cat("   ",url)
+        dest <- paste(rep,"/",dep,".zip",sep="")
+        tt <- try(download.file(url,destfile = dest),silent = TRUE)
+        if(class(tt)[1]=="try-error") {
+            cat("Error for departement:", dep,"\n")
+        } else {
+            cat("  --> DONE !\n Extract ...")
+
+            unzip(dest,exdir=rep)
+            cat("  --> DONE !\n\n")
+        }
+
+    }
+
+}
+
+
+
+import_multiShape <- function(toSQL=FALSE,import=FALSE,doUnion=TRUE,shape_name="oso_france_2017",
+                              nameIdGroupColumn="departement",typeIdGroupColumn="varchar(2)",
+                              doColumnChecking=FALSE,doOriginalTableDroping=TRUE,importTableClasses=TRUE,
+                              vecOriginalTableKeeped=paste("departement",c("75","91","92","94","78","44")),
+                              con=NULL,
+                              db_name="birdlab",nameUser="romain",pw=NULL) {
+
+
+
+    ## --- initializing parameters for debugging ----
+    ## toSQL=FALSE;import=FALSE;doUnion=TRUE;
+    ## shape_name="theia_france_2016"
+    ## nameIdGroupColumn="departement";typeIdGroupColumn="varchar(2)"
+    ## doColunmChecking=TRUE;doOriginalTableDroping=TRUE;vecOriginalTableKeeped=paste("departement",c("75","91","92","94","78","44"),sep="_")
+    ## con=NULL
+    ## db_name="birdlab";nameUser="romain"; pw=NULL
+    ## ---
+
+    path.shape<- paste(getwd(),"/shape/theia/",sep="")
+    vecF <- dir(path.shape)                          #
+    vecF <- vecF[grep("shp",vecF)]
+    pathSQL <- paste(getwd(),"/sql/",sep="")
+    vec.tableName <- NULL
+    tabCol <- NULL
+
+    if(toSQL){
+        cat("\n\n --- Shape to SQL ---\n\n")
+        for(f in vecF) {
+            cat("\n\n - file: ",f,"\n")
+            fsql <- paste(path.shape,"theia2016_",substr(f,13,14),".sql",sep="")
+            cmd <- paste("shp2pgsql -I -s 2154  ",path.shape,f," >  ",fsql," \n",sep="")
+            myshell(cmd,invisible=TRUE)
+        }
+
+    }
+
+
+    if(import) {
+        cat("\n\n --- Importation SQL ---\n\n")
+        vec.tableName <- rep(NA,length(vecF))
+        if(is.null(con)) con <- openDB.PSQL(user=nameUser,pw=pw)
+        i <- 0
+        for(f in vecF) {
+            i <- i+1
+            fsql <- paste(path.shape,"theia2016_",substr(f,13,14),".sql",sep="")
+            name_table <- tail(readLines(fsql, n=4),1)
+            name_table <- gsub("CREATE TABLE \"","",name_table)
+            name_table <- gsub("\" (gid serial,","",name_table,fixed=TRUE)
+            vec.tableName[i] <- name_table
+            query <- paste("DROP TABLE IF EXISTS ",name_table,";")
+            cat("drop query:", query,"\n")
+            dbSendQuery(con, query)
+            cat("\n\n - file: ",fsql,"\n")
+            cmd <- paste("psql -U ",nameUser," -d ",db_name," -f ",fsql,sep="")
+            myshell(cmd,invisible=TRUE)
+        }
+    }
+
+
+
+    if(doColumnChecking) {
+        if(is.null(con)) con <- openDB.PSQL(user=nameUser,pw=pw)
+        if(is.null(vec.tableName)) {
+            vec.tableName <- rep(NA,length(vecF))
+            i <- 0
+            for(f in vecF) {
+                i <- i+1
+                fsql <- paste(path.shape,"theia2016_",substr(f,13,14),".sql",sep="")
+                name_table <- tail(readLines(fsql, n=4),1)
+                name_table <- gsub("CREATE TABLE \"","",name_table)
+                name_table <- gsub("\" (gid serial,","",name_table,fixed=TRUE)
+                vec.tableName[i] <- name_table
+            }
+        }
+
+
+        ## check column of departement tables
+        tabCol <- NULL
+        for(tt in vec.tableName) {
+            query<- paste("SELECT column_name , data_type FROM information_schema.columns WHERE table_name   = '",tt,"';",sep="")
+            cat("Colonne names query:\n", query,"\n")
+            cnames <- dbGetQuery(con, query)
+            tabCol <- unique(rbind(tabCol,cnames))
+        }
+
+        dupli <- duplicated(tabCol$column_name)
+        if(any(dupli)) {
+
+            cat("Warning !!   -> column_name with sevaral data_type\n")
+
+            duplicol <- tabCol$column_name[dupli]
+            for(col in duplicol) {
+                print(subset(tabCol,column_name == col))
+                theLines <- rownames(subset(tabCol,column_name == col))
+                cat("Write the line number that you want to keep (with the most generalist data type)\n",paste(theLines,collapse=" or "),"\n")
+                i <- readline()
+                while(!(i %in% theLines)) {
+                    cat("Error, the line number is not among the possibilities\nplease write again\n",paste(theLines,collapse=" or "),"\n")
+                    i <- readline()
+
+                } #end while
+
+                lines_deleted <- setdiff(theLines,i)
+                tabCol <- tabCol[!(rownames(tabCol) %in% lines_deleted),]
+
+            } #end for(col in duplicol)
+        }#  if(length(dupli)>0)
+
+        for(tt in vec.tableName) {
+            query <- paste("SELECT column_name , data_type FROM information_schema.columns WHERE table_name   = '",tt,"';",sep="")
+            cat("Colonne names query:\n", query,"\n")
+            tabCol.table <- dbGetQuery(con, query)
+            if(any(dupli)) {
+                for(col in duplicol) {
+                    if(tabCol.table$data_type[tabCol.table$column_name==col] != tabCol$data_type[tabCol$column_name==col]) {
+                        query <- paste("ALTER TABLE  ",tt,"\n",
+                                       "ALTER COLUMN",col," type ",tabCol$data_type[tabCol$column_name==col],";")
+                        cat("Changing column type query:\n", query,"\n",sep="")
+                        dbSendQuery(con, query)
+                    } #end if
+
+                }#end for(col in duplicol)
+            } #end if(any(dupli))
+
+            if(any(!(tabCol$column_name%in%tabCol.table$column_name))) {
+                newcol <- tabCol$column_name[!(tabCol$column_name%in%tabCol.table$column_name)]
+                for(nc in newcol) {
+                    query <- paste("ALTER TABLE  ",tt," ADD COLUMN ",nc," ",tabCol$data_type[tabCol$column_name==nc],";",sep="")
+                    cat("ADD COLUMN query:\n", query,"\n",sep="")
+                    dbSendQuery(con, query)
+                } #end for(nc in newcol)
+            }#end if(any!...
+            if(!(is.null(nameIdGroupColumn))) {
+                query <- paste("ALTER TABLE  ",tt," DROP COLUMN IF EXISTS ",nameIdGroupColumn,";\n",
+                               "ALTER TABLE  ",tt," ADD COLUMN ",nameIdGroupColumn," ",typeIdGroupColumn,";\n",#" default ",substr(tt,nchar(tt)-1,nchar(tt)),";\n",
+                               "UPDATE ",tt," SET ",nameIdGroupColumn," = '",substr(tt,nchar(tt)-1,nchar(tt)),"';",sep="")
+                cat("ADD COLUMN for group identification '",nameIdGroupColumn,"':\n",query,"\n",sep="")
+                dbSendQuery(con, query)
+            }#end if(!(is.null(nameIdGroupColumn))
+            nameIdGroupColumn="departement";typeIdGroupColumn="varchar(2)"
+        }#end for(tt in vec.tableName) end of ALTER TABLE  to fit column between table
+
+
+    }#end if(doColumnChecking)
+
+    if(doUnion) {
+        if(is.null(vec.tableName)) {
+            vec.tableName <- rep(NA,length(vecF))
+            i <- 0
+            for(f in vecF) {
+                i <- i+1
+                fsql <- paste(path.shape,"theia2016_",substr(f,13,14),".sql",sep="")
+                name_table <- tail(readLines(fsql, n=4),1)
+                name_table <- gsub("CREATE TABLE \"","",name_table)
+                name_table <- gsub("\" (gid serial,","",name_table,fixed=TRUE)
+                vec.tableName[i] <- name_table
+            }#end if(is.null(vec.tableName))
+        }#end
+
+        if(is.null(tabCol)) {
+            for(tt in vec.tableName) {
+                query<- paste("SELECT column_name , data_type FROM information_schema.columns WHERE table_name   = '",tt,"';",sep="")
+                cat("Colonne names query:\n", query,"\n")
+                cnames <- dbGetQuery(con, query)
+                tabCol <- unique(rbind(tabCol,cnames))
+            }
+
+        }
+
+        query.head <- paste("DROP TABLE IF EXISTS theia_france_2016;\n",
+                            "CREATE TABLE theia_france_2016 as(\n")
+        subquery.column <- paste(c(ifelse(is.null(nameIdGroupColumn),"",nameIdGroupColumn),
+                                   setdiff(tabCol$column_name,nameIdGroupColumn)),collapse=",")
+        query.body <- paste(paste("select ",subquery.column," \n from ", vec.tableName),collapse="\n union ")
+        query.tail <- "\n);"
+        query <- paste(query.head,query.body,query.tail,sep="")
+        cat("Union query:\n",query,"\n",sep="")
+
+        dbSendQuery(con, query)
+
+        pathSQL <- paste(getwd(),"/sql/",sep="")
+        cmd <- paste("psql -U ",nameUser," ",db_name," < ",pathSQL,"postgres_index_theia.sql",sep="")
+        myshell(cmd)
+
+
+
+    }#end if(doUnion)
+
+    if(doOriginalTableDroping) {
+        if(is.null(vec.tableName)) {
+            vec.tableName <- rep(NA,length(vecF))
+            i <- 0
+            for(f in vecF) {
+                i <- i+1
+                fsql <- paste(path.shape,"theia2016_",substr(f,13,14),".sql",sep="")
+                name_table <- tail(readLines(fsql, n=4),1)
+                name_table <- gsub("CREATE TABLE \"","",name_table)
+                name_table <- gsub("\" (gid serial,","",name_table,fixed=TRUE)
+                vec.tableName[i] <- name_table
+            }#end if(is.null(vec.tableName))
+        }#end
+        if(!is.null(vecOriginalTableKeeped)) {
+            vec.tableName <- setdiff(vec.tableName,vecOriginalTableKeeped)
+        }
+        query <- paste(paste(paste("DROP TABLE IF EXISTS ", vec.tableName,sep=""),collapse=";\n"),";",sep="")
+        cat("Drop query:\n",query,"\n")
+
+        dbSendQuery(con, query)
+
+    }
+
+    if(importTableClasses){
+        if(is.null(con)) con <- openDB.PSQL(user=nameUser,pw=pw)
+        pathSQL <- paste(getwd(),"/sql/",sep="")
+        cmd_init <- paste("psql -U ",nameUser," ",db_name," < ",pathSQL,"postgres_init_theia_classes.sql",sep="")
+        myshell(cmd_init)
+
+        path.data <- paste(getwd(),"/generic_data/theia_classes.csv",sep="")
+
+        fileImportTable.theia_classes <- paste(pathSQL,"_postgres_import_theia_classes.sql",sep="")
+        cat("\\copy theia_classes FROM ",path.data," with (format csv, header, delimiter ';')\n",
+            sep="",file=fileImportTable.theia_classes)
+
+        cmd_import <- paste("psql -U ",nameUser," ",db_name," < ",fileImportTable.theia_classes,sep="")
+        myshell(cmd_import)
+
+    }
+
+
+
+}
+
