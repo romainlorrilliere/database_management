@@ -10,7 +10,6 @@ library(sf)
 library(ggplot2)
 library(tidyverse)
 library(lwgeom)
-
 library(rcartocolor)
 
 exemple <- FALSE
@@ -36,7 +35,7 @@ Encoding_utf8 <- function(x) {
 
                                         #d_diff<- coast2country(monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry = c(vec_cntry[1:2], "FRA"))
 
-coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec_cntry=NULL) {
+coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec_cntry=NULL,i_start=NULL,i_end=NULL) {
 
     start <- Sys.time()
     if(is.null(id)) id <- format(start, "%Y-%m-%d")
@@ -81,11 +80,21 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
     tab_cod_nam <- st_drop_geometry(tdwg) %>% subset(select=c("level3_cod","level3_nam")) %>% unique()
     rownames(tab_cod_nam) <- tab_cod_nam$level3_cod
 
-    if(is.null(vec_cntry)) vec_cntry <- unique(diffprecision$cntry_code)
+    if(is.null(vec_cntry)) vec_cntry <- sort(as.character(unique(diffprecision$cntry_code)))
 
     tab_cntry <- unique(st_drop_geometry(diffprecision)[,c("cntry_code","cntry_name")])
 
+
+    if(is.null(i_start))  i_start <- 1
+
+    vec_cntry <- vec_cntry[i_start:length(vec_cntry)]
+
+    if(is.null(i_end)) i_end <- length(vec_cntry) else i_end <- (i_end - i_start + 1)
+    vec_cntry <- vec_cntry[1:i_end]
+
     tab_cntry <- subset(tab_cntry, cntry_code %in% vec_cntry)
+    tab_cntry <- tab_cntry[order(tab_cntry$cntry_code),]
+
 
     nb_cntry <- length(vec_cntry)
     cat("\n",nb_cntry,"pays:\n")
@@ -405,7 +414,7 @@ if (exemple) {
     monde_simple <- readRDS("data/monde_simple.rds")
   #  d_diff<- coast2country(monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=c("FRA","ARG"))
 
-    d_diff<- coast2country(monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL)
+    d_diff<- coast2country(monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=3,i_end=4)
 
 }
 
