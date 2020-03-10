@@ -105,7 +105,6 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
     vecCol_tot <- rcartocolor::carto_pal(12, "Bold")#7F3C8D,#11A579,#3969AC,#F2B701,#E73F74,#80BA5A,#E68310,#008695,#CF1C90,#f97b72,#4b4b8f,#A5AA99)
 
     for(i in 1:length(vec_cntry)) {
-                                        #browser()
         code_cntry <- tab_cntry$cntry_code[i]
         name_cntry <- tab_cntry$cntry_name[i]
 
@@ -140,9 +139,6 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
             flush.console()
             buff_rad <- rad/5
             tdwg_cntry_buff0 <- st_buffer(tdwg_cntry, buff_rad)
-            ##browser()
-
-
 
             ## gg <- ggplot() + geom_sf(data=tdwg_cntry_buff0,aes(fill=level3_cod),colour=NA,alpha=0.5)
             ##  gg
@@ -159,7 +155,6 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
             tdwg_cntry_buff0_out <- tdwg_cntry_buff0_out[,colnames(tdwg_cntry_buff0)]
             cat("   DONE!\n")
                                         #  tdwg_cntry_buff0 <- rbind(tdwg_cntry_buff0 ,tdwg_cntry_buff0_out)
-            ##browser()
 
             cat("(4/11) Border buffer polygons simplification\n")
             flush.console()
@@ -194,28 +189,27 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
             ## print(gg)
 
             diff_poly0 <- st_intersection(diffprecision_cntry,tdwg_cntry_buff)
+
             if(nrow(diff_poly0)>0) {
                 diff_poly <- st_intersection(diff_poly0)
 
-
-
                 cat("   DONE!\n")
-
 
                 cat("(7/11) Select the polygon those interact with ",code_cntry," border or with only one border\n")
                 flush.console()
                 i_good <- which(diff_poly$level3_cod == code_cntry | diff_poly$n.overlaps == 1)
                 diff_good <- diff_poly[i_good,]
 
-                                        #browser()
                 diff_good <- subset(diff_good,level3_cod != "")
 
                 cat("(8/11) Manage the polygons those interesct with several borders\n")
                 flush.console()
                 diff_conflit <- diff_poly[setdiff(1:nrow(diff_poly),i_good),]
 
+
                 if(nrow(diff_conflit) > 0) {
                     cat("nb of conflicts:",nrow(diff_conflit),"")
+                    diff_conflit <- st_buffer(diff_conflit,0.001) %>% st_cast('MULTIPOLYGON')  %>% st_cast('POLYGON', warn=F)
                     near <- st_nearest_feature(diff_conflit,tdwg_cntry)
                     diff_conflit$level3_cod <- tdwg_cntry$level3_cod[near]
                     diff_conflit$level3_name <- tdwg_cntry$level3_name[near]
@@ -242,7 +236,7 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
 
                     cat("nb of polygons:",nrow(diff_out_cast),"\n")
 
-                    if(rad >= 10) {
+                    if(rad >= 9) {
                         cat(" ! Radius wider that 10°, we search closer country polygon also for polygon those do not intersect with the border buffers !! \n" )
                         flush.console()
                         near <- st_nearest_feature(diff_out_cast,tdwg_cntry)
@@ -264,13 +258,62 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
 
 
 
+                if(flag_while_buff) {
+                    rad <- rad * 2
+                    diff_out <- diff_out[,colnames(diffprecision_cntry)]
+                    diffprecision_cntry <- diff_out
+                    cat("   DONE!\n")
+                } else {
+                    cat("   SKIP!\n")
+                }
+
+                diff_cntry <- rbind(diff_cntry,diff_good)
+            } else {
+
+                cat("\n !! all polygons are outside border buffer !!\n")
+
+
+                if(rad >= 9) {
+
+                    diff_out <- st_intersection(diffprecision_cntry,tdwg_cntry_buff0_out)
+
+                      diff_out_cast <- st_buffer(diff_out,0.001) %>% st_cast('MULTIPOLYGON')  %>% st_cast('POLYGON', warn=F)
+                    diff_out_cast$n.overlaps <- NA
+                    diff_out_cast$origins <- NA
+                    diff_out_cast <- diff_out_cast[,colnames(diff_good)]
+
+                    cat("nb of polygons:",nrow(diff_out_cast),"\n")
+
+
+                        cat(" ! Radius wider that 10°, we search closer country polygon also for polygon those do not intersect with the border buffers !! \n" )
+                        flush.console()
+                        near <- st_nearest_feature(diff_out_cast,tdwg_cntry)
+                        diff_out_cast$level3_cod <- tdwg_cntry$level3_cod[near]
+                        diff_out_cast$level3_name <- tdwg_cntry$level3_name[near]
+                        diff_out_cast$level2_cod <- tdwg_cntry$level2_cod[near]
+                        diff_out_cast$level1_cod <- tdwg_cntry$level1_cod[near]
+
+                        diff_good <- diff_out_cast
+                        cat("   DONE!\n")
+
+                        diff_out <- subset(diff_out,level3_cod != "")
+                        diff_out_cast <- subset(diff_out,level3_cod != "")
+                    }
+
+
+                cat("\n section from 6 to 9 skipped !! \n")
+             }
+
+            flush.console()
+
+
                 cat("(10/12) Calcul du nombre de polygones et de leur centroid\n")
                 flush.console()
                 ## obliger de faire un tout petit buffer car certain elements sont des polystrings
                 diff_good_buff <- st_buffer(diff_good,0.001)
                 diff_gg_cast <- diff_good_buff %>% st_cast('MULTIPOLYGON')  %>% st_cast('POLYGON', warn=F)
-                ## browser()
-                ##  gg <- ggplot() +geom_sf(data=monde_simple_cntry_strict_buff,fill="blue",colour=NA,alpha=0.5)+ geom_sf(data=tdwg_cntry_buff0,aes(fill=level3_cod),colour=NA,alpha=0.5)+ geom_sf(data=tdwg_cntry,aes(fill=level3_cod),alpha=.5)+ geom_sf(data=diffprecision_cntry,size=5,colour="red",fill="red") + geom_sf(data=diff_poly,fill=NA,colour="blue",size=3) +  geom_sf(data=diff_good,fill=NA,colour="white",size=2)+  geom_sf(data=diff_gg_cast,fill=NA,colour="black",size=1)
+
+            ##  gg <- ggplot() +geom_sf(data=monde_simple_cntry_strict_buff,fill="blue",colour=NA,alpha=0.5)+ geom_sf(data=tdwg_cntry_buff0,aes(fill=level3_cod),colour=NA,alpha=0.5)+ geom_sf(data=tdwg_cntry,aes(fill=level3_cod),alpha=.5)+ geom_sf(data=diffprecision_cntry,size=5,colour="red",fill="red") + geom_sf(data=diff_poly,fill=NA,colour="blue",size=3) +  geom_sf(data=diff_good,fill=NA,colour="white",size=2)+  geom_sf(data=diff_gg_cast,fill=NA,colour="black",size=1)
                 ## gg
 
                 if(nrow(diff_out)>0) diff_gg_cast <- rbind(diff_gg_cast,diff_out_cast)
@@ -293,8 +336,6 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
                 tt_diff$txt <- paste0(tt_diff$nom,": ",tt_diff$nb)
 
 
-#########------------------------###################
-
                 txt <- paste0("conflit: ",nrow(diff_conflit),", good: ",nrow(diff_good),", out: ",nrow(diff_out),"\n")
                 if(nrow(tt_diff)<4) {
                     attrib <- paste(tt_diff$txt,collapse=" | ")
@@ -307,19 +348,16 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
                 }
 
                 txt <- paste0(txt,attrib)
-
+            cat("\n\n----------------------\n\n")
                 cat(txt)
                 cat("\n")
-
+            cat("\n\n----------------------\n\n")
                 cat("   DONE!\n")
                 flush.console()
 
 
                 cat("(11/12) Figure\n")
                 flush.console()
-
-
-                ## if(rad ==  5) browser()
 
 
                 level3_cod <- tt_diff$level3_cod
@@ -359,25 +397,9 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
                 flush.console()
                 flag_while_buff <- nrow(diff_out) > 0
 
-                if(flag_while_buff) {
-                    rad <- rad * 2
-                    diff_out <- diff_out[,colnames(diffprecision_cntry)]
-                    diffprecision_cntry <- diff_out
-                    cat("   DONE!\n")
-                } else {
-                    cat("   SKIP!\n")
-                }
+            rad <- rad * 2
 
-                diff_cntry <- rbind(diff_cntry,diff_good)
-            } else {
 
-                cat("\n !! all polygons are outside border buffer !!\n")
-
-                cat("\n section from 6 to 12 skipped !! \n")
-                flag_while_buff <- TRUE
-                rad <- rad * 2
-            }
-            flush.console()
         }
         cat("\n** End of country:",code_cntry,"\n")
         diff <- rbind(diff,diff_cntry)
@@ -390,6 +412,23 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
 
         reste <- duration/i * (nb_cntry-i)
 
+
+        vecUnits <- c("secs", "mins", "hours","days", "weeks")
+        i_units <- which(vecUnits == units(reste))
+
+        if(i_units < 5) {
+            reste2 <- reste
+            units(reste2) <- vecUnits[i_units + 1]
+
+            while(i_units < 4 & reste2 > 1) {
+                reste <- reste2
+                i_units <- which(vecUnits == units(reste))
+                reste2 <- reste
+                units(reste2) <- vecUnits[i_units + 1]
+            }
+            if(reste2 > 1) reste <- reste2
+        }
+
         cat("\n[",i,"/",nb_cntry,"]  |--> Elapsed time: ",round(duration,1)," ",attr(duration,"units"),"   -->|  Estimated time: ",round(reste,1)," ",attr(reste,"units"),"\n",sep="")
         flush.console()
     }
@@ -398,7 +437,7 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
     cat("   DONE!\n")
 
     end <- Sys.time()
-    duration <- current-start
+    duration <- end-start
 
     cat("\n\nEND !  ",format(end, "%Y-%m-%d %X"),"  -- Total duration: ",round(duration,1)," ",attr(duration,"units"),"\n",sep="")
 
@@ -414,7 +453,9 @@ if (exemple) {
     monde_simple <- readRDS("data/monde_simple.rds")
   #  d_diff<- coast2country(monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=c("FRA","ARG"))
 
-    d_diff<- coast2country(monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=3,i_end=4)
+  ##  d_diff<- coast2country(id="test30",monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=30,i_end=NULL)
+
+d_diff<- coast2country(id=NULL,monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=30,i_end=NULL)
 
 }
 
