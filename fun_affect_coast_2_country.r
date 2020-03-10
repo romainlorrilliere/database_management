@@ -455,7 +455,7 @@ if (exemple) {
 
   ##  d_diff<- coast2country(id="test30",monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=30,i_end=NULL)
 
-d_diff<- coast2country(id=NULL,monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=30,i_end=NULL)
+d_diff<- coast2country(id=NULL,monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=1,i_end=3)
 
 }
 
