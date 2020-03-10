@@ -14,18 +14,6 @@ library(rcartocolor)
 
 exemple <- FALSE
 
-##load("data/workspace_260220.Rdata")
-
-##load("data/tmp_diffprecision.RData")
-
-
-##monde_simple <- st_simplify(monde,preserveTopology=TRUE,dTolerance=1)
-
-##saveRDS(monde_simple,"data/monde_simple.rds")
-
-##monde_simple <- readRDS("data/monde_simple.rds")
-
-##code_cntry <- "FRA"
 
 Encoding_utf8 <- function(x) {
     Encoding(x) <- "UTF-8"
@@ -33,7 +21,32 @@ Encoding_utf8 <- function(x) {
 }
 
 
-                                        #d_diff<- coast2country(monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry = c(vec_cntry[1:2], "FRA"))
+time_estimation <- function(i,nb_tot,start,current) {
+
+    duration <- current-start
+    reste <- duration/i * (nb_tot-i)
+
+
+    vecUnits <- c("secs", "mins", "hours","days", "weeks")
+    i_units <- which(vecUnits == units(reste))
+
+    if(i_units < 5) {
+        reste2 <- reste
+        units(reste2) <- vecUnits[i_units + 1]
+
+        while(i_units < 4 & reste2 > 1) {
+            reste <- reste2
+            i_units <- which(vecUnits == units(reste))
+            reste2 <- reste
+            units(reste2) <- vecUnits[i_units + 1]
+        }
+        if(reste2 > 1) reste <- reste2
+    }
+
+    return(reste)
+}
+
+
 
 coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec_cntry=NULL,i_start=NULL,i_end=NULL) {
 
@@ -52,7 +65,7 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
     }
 
 
- rep_out <- paste0("output")
+    rep_out <- paste0("output")
     if(!dir.exists(rep_out))
     {
         cat("\nCréation du repertoire de sortie des figures: output\n")
@@ -254,17 +267,7 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
                 } else {
                     cat("No polygon outside border buffers\n")
                     flush.console()
-                }
 
-
-
-                if(flag_while_buff) {
-                    rad <- rad * 2
-                    diff_out <- diff_out[,colnames(diffprecision_cntry)]
-                    diffprecision_cntry <- diff_out
-                    cat("   DONE!\n")
-                } else {
-                    cat("   SKIP!\n")
                 }
 
                 diff_cntry <- rbind(diff_cntry,diff_good)
@@ -277,7 +280,7 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
 
                     diff_out <- st_intersection(diffprecision_cntry,tdwg_cntry_buff0_out)
 
-                      diff_out_cast <- st_buffer(diff_out,0.001) %>% st_cast('MULTIPOLYGON')  %>% st_cast('POLYGON', warn=F)
+                    diff_out_cast <- st_buffer(diff_out,0.001) %>% st_cast('MULTIPOLYGON')  %>% st_cast('POLYGON', warn=F)
                     diff_out_cast$n.overlaps <- NA
                     diff_out_cast$origins <- NA
                     diff_out_cast <- diff_out_cast[,colnames(diff_good)]
@@ -285,149 +288,140 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
                     cat("nb of polygons:",nrow(diff_out_cast),"\n")
 
 
-                        cat(" ! Radius wider that 10°, we search closer country polygon also for polygon those do not intersect with the border buffers !! \n" )
-                        flush.console()
-                        near <- st_nearest_feature(diff_out_cast,tdwg_cntry)
-                        diff_out_cast$level3_cod <- tdwg_cntry$level3_cod[near]
-                        diff_out_cast$level3_name <- tdwg_cntry$level3_name[near]
-                        diff_out_cast$level2_cod <- tdwg_cntry$level2_cod[near]
-                        diff_out_cast$level1_cod <- tdwg_cntry$level1_cod[near]
+                    cat(" ! Radius wider that 10°, we search closer country polygon also for polygon those do not intersect with the border buffers !! \n" )
+                    flush.console()
+                    near <- st_nearest_feature(diff_out_cast,tdwg_cntry)
+                    diff_out_cast$level3_cod <- tdwg_cntry$level3_cod[near]
+                    diff_out_cast$level3_name <- tdwg_cntry$level3_name[near]
+                    diff_out_cast$level2_cod <- tdwg_cntry$level2_cod[near]
+                    diff_out_cast$level1_cod <- tdwg_cntry$level1_cod[near]
 
-                        diff_good <- diff_out_cast
-                        cat("   DONE!\n")
+                    diff_good <- diff_out_cast
+                    cat("   DONE!\n")
 
-                        diff_out <- subset(diff_out,level3_cod != "")
-                        diff_out_cast <- subset(diff_out,level3_cod != "")
-                    }
+                    diff_out <- subset(diff_out,level3_cod != "")
+                    diff_out_cast <- subset(diff_out,level3_cod != "")
+                }
 
 
                 cat("\n section from 6 to 9 skipped !! \n")
-             }
+            }
 
             flush.console()
 
 
-                cat("(10/12) Calcul du nombre de polygones et de leur centroid\n")
-                flush.console()
-                ## obliger de faire un tout petit buffer car certain elements sont des polystrings
-                diff_good_buff <- st_buffer(diff_good,0.001)
-                diff_gg_cast <- diff_good_buff %>% st_cast('MULTIPOLYGON')  %>% st_cast('POLYGON', warn=F)
+            cat("(10/12) Calcul du nombre de polygones et de leur centroid\n")
+            flush.console()
+            ## obliger de faire un tout petit buffer car certain elements sont des polystrings
+            diff_good_buff <- st_buffer(diff_good,0.001)
+            diff_gg_cast <- diff_good_buff %>% st_cast('MULTIPOLYGON')  %>% st_cast('POLYGON', warn=F)
 
             ##  gg <- ggplot() +geom_sf(data=monde_simple_cntry_strict_buff,fill="blue",colour=NA,alpha=0.5)+ geom_sf(data=tdwg_cntry_buff0,aes(fill=level3_cod),colour=NA,alpha=0.5)+ geom_sf(data=tdwg_cntry,aes(fill=level3_cod),alpha=.5)+ geom_sf(data=diffprecision_cntry,size=5,colour="red",fill="red") + geom_sf(data=diff_poly,fill=NA,colour="blue",size=3) +  geom_sf(data=diff_good,fill=NA,colour="white",size=2)+  geom_sf(data=diff_gg_cast,fill=NA,colour="black",size=1)
-                ## gg
+            ## gg
 
-                if(nrow(diff_out)>0) diff_gg_cast <- rbind(diff_gg_cast,diff_out_cast)
-                diff_gg_cast <- st_centroid(diff_gg_cast)
-                diff_gg_cast_df <- st_drop_geometry(diff_gg_cast)
+            if(nrow(diff_out)>0) diff_gg_cast <- rbind(diff_gg_cast,diff_out_cast)
+            diff_gg_cast <- st_centroid(diff_gg_cast)
+            diff_gg_cast_df <- st_drop_geometry(diff_gg_cast)
 
-                tt_diff <- data.frame(table( diff_gg_cast_df$level3_cod),stringsAsFactors=FALSE)
-
-
-                colnames(tt_diff) <- c("level3_cod","nb")
-                tt_diff <- left_join(tt_diff,tab_cod_nam)
-                tt_diff$level3_nam[is.na(tt_diff$level3_nam)] <- ""
-
-                tt_diff$nom <- paste0(tt_diff$level3_nam," (",tt_diff$level3_cod,")")
-                tt_diff$nom[tt_diff$nom==" ()"] <- "out"
-                tt_diff$nb[tt_diff$nom=="out"] <- tt_diff$nb[tt_diff$nom=="out"] * -1
-                tt_diff <- tt_diff[order(tt_diff$nb,decreasing=TRUE),]
-                tt_diff$nb[tt_diff$nom=="out"] <- tt_diff$nb[tt_diff$nom=="out"] * -1
-
-                tt_diff$txt <- paste0(tt_diff$nom,": ",tt_diff$nb)
+            tt_diff <- data.frame(table( diff_gg_cast_df$level3_cod),stringsAsFactors=FALSE)
 
 
-                txt <- paste0("conflit: ",nrow(diff_conflit),", good: ",nrow(diff_good),", out: ",nrow(diff_out),"\n")
-                if(nrow(tt_diff)<4) {
-                    attrib <- paste(tt_diff$txt,collapse=" | ")
-                } else {
-                    txt_attrib <-  tt_diff$txt
-                    nb_attrib <- length(txt_attrib)
-                    txt_attrib <- c(txt_attrib, rep("",3-(nb_attrib %% 3)))
-                    tab_txt <- matrix(txt_attrib,ncol=3,byrow=TRUE)
-                    attrib <- paste(apply(tab_txt,1,paste,collapse=" | "),collapse="\n")
-                }
+            colnames(tt_diff) <- c("level3_cod","nb")
+            tt_diff <- left_join(tt_diff,tab_cod_nam)
+            tt_diff$level3_nam[is.na(tt_diff$level3_nam)] <- ""
 
-                txt <- paste0(txt,attrib)
+            tt_diff$nom <- paste0(tt_diff$level3_nam," (",tt_diff$level3_cod,")")
+            tt_diff$nom[tt_diff$nom==" ()"] <- "out"
+            tt_diff$nb[tt_diff$nom=="out"] <- tt_diff$nb[tt_diff$nom=="out"] * -1
+            tt_diff <- tt_diff[order(tt_diff$nb,decreasing=TRUE),]
+            tt_diff$nb[tt_diff$nom=="out"] <- tt_diff$nb[tt_diff$nom=="out"] * -1
+
+            tt_diff$txt <- paste0(tt_diff$nom,": ",tt_diff$nb)
+
+
+            txt <- paste0("conflit: ",nrow(diff_conflit),", good: ",nrow(diff_good),", out: ",nrow(diff_out),"\n")
+            if(nrow(tt_diff)<4) {
+                attrib <- paste(tt_diff$txt,collapse=" | ")
+            } else {
+                txt_attrib <-  tt_diff$txt
+                nb_attrib <- length(txt_attrib)
+                txt_attrib <- c(txt_attrib, rep("",3-(nb_attrib %% 3)))
+                tab_txt <- matrix(txt_attrib,ncol=3,byrow=TRUE)
+                attrib <- paste(apply(tab_txt,1,paste,collapse=" | "),collapse="\n")
+            }
+
+            txt <- paste0(txt,attrib)
             cat("\n\n----------------------\n\n")
-                cat(txt)
-                cat("\n")
+            cat(txt)
+            cat("\n")
             cat("\n\n----------------------\n\n")
+            cat("   DONE!\n")
+            flush.console()
+
+
+            cat("(11/12) Figure\n")
+            flush.console()
+
+
+            level3_cod <- tt_diff$level3_cod
+            nb_col <- length(level3_cod)
+            vecCol_name<- c(level3_cod,"other","out")
+            vecCol_values <- c(vecCol_tot[1:nb_col],"#969696","#000000")
+            names(vecCol_values) <- vecCol_name
+
+            tdwg_cntry_buff$gg_cod <- ifelse(tdwg_cntry_buff$level3_cod %in% level3_cod,tdwg_cntry_buff$level3_cod,"other")
+            tdwg_cntry$gg_cod <- ifelse(tdwg_cntry$level3_cod %in% level3_cod,tdwg_cntry$level3_cod,"other")
+            diff_gg_cast$gg_cod <- ifelse(diff_gg_cast$level3_cod =="","out", diff_gg_cast$level3_cod)
+
+
+            gg <- ggplot()
+            gg <- gg + geom_sf(data=monde_simple_cntry_strict_buff,colour="black",size=1,fill=NA)
+            gg <- gg + geom_sf(data=tdwg_cntry,aes(fill=gg_cod),colour="black",alpha=0.2)
+            gg <- gg + geom_sf(data=tdwg_cntry_buff,aes(fill=gg_cod),colour=NA,alpha=0.2)
+            gg <- gg + geom_sf(data= tdwg_cntry_buff0_out,colour="white",size=1,fill="white",alpha=0.5)
+            gg <- gg + geom_sf(data=diff_gg_cast,aes(colour=gg_cod),size=1.2)
+            gg <- gg + scale_colour_manual(values=vecCol_values)
+            gg <- gg + scale_fill_manual(values=vecCol_values,guide=FALSE)
+
+            gg <- gg + labs(fill="",colour="",title=paste0(name_cntry," (",code_cntry,") et pays proches | Zone: ",rad,"| Buffer:",round(buff_rad,2)),subtitle=txt)
+
+            print(gg)
+            ##
+
+            ggfile <- paste0(rep_fig,"/",id,"_",code_cntry,"_",rad*10,".png")
+
+            cat(" --> ",ggfile)
+
+            ggsave(ggfile,gg,width=10,height=8)
+            cat("   DONE!\n")
+            flush.console()
+
+            cat("(12/12) End of Buffer:",rad,"   Preparing next radius\n")
+            flush.console()
+
+            flag_while_buff <- nrow(diff_out) >0
+            if(flag_while_buff) {
+                rad <- rad * 2
+                diff_out <- diff_out[,colnames(diffprecision_cntry)]
+                diffprecision_cntry <- diff_out
                 cat("   DONE!\n")
-                flush.console()
+            } else {
+                cat("   SKIP!\n")
+            }
 
-
-                cat("(11/12) Figure\n")
-                flush.console()
-
-
-                level3_cod <- tt_diff$level3_cod
-                nb_col <- length(level3_cod)
-                vecCol_name<- c(level3_cod,"other","out")
-                vecCol_values <- c(vecCol_tot[1:nb_col],"#969696","#000000")
-                names(vecCol_values) <- vecCol_name
-
-                tdwg_cntry_buff$gg_cod <- ifelse(tdwg_cntry_buff$level3_cod %in% level3_cod,tdwg_cntry_buff$level3_cod,"other")
-                tdwg_cntry$gg_cod <- ifelse(tdwg_cntry$level3_cod %in% level3_cod,tdwg_cntry$level3_cod,"other")
-                diff_gg_cast$gg_cod <- ifelse(diff_gg_cast$level3_cod =="","out", diff_gg_cast$level3_cod)
-
-
-                gg <- ggplot()
-                gg <- gg + geom_sf(data=monde_simple_cntry_strict_buff,colour="black",size=1,fill=NA)
-                gg <- gg + geom_sf(data=tdwg_cntry,aes(fill=gg_cod),colour="black",alpha=0.2)
-                gg <- gg + geom_sf(data=tdwg_cntry_buff,aes(fill=gg_cod),colour=NA,alpha=0.2)
-                gg <- gg + geom_sf(data= tdwg_cntry_buff0_out,colour="white",size=1,fill="white",alpha=0.5)
-                gg <- gg + geom_sf(data=diff_gg_cast,aes(colour=gg_cod),size=1.2)
-                gg <- gg + scale_colour_manual(values=vecCol_values)
-                gg <- gg + scale_fill_manual(values=vecCol_values,guide=FALSE)
-
-                gg <- gg + labs(fill="",colour="",title=paste0(name_cntry," (",code_cntry,") et pays proches | Zone: ",rad,"| Buffer:",round(buff_rad,2)),subtitle=txt)
-
-                print(gg)
-                ##
-
-                ggfile <- paste0(rep_fig,"/",id,"_",code_cntry,"_",rad*10,".png")
-
-                cat(" --> ",ggfile)
-
-                ggsave(ggfile,gg,width=10,height=8)
-                cat("   DONE!\n")
-                flush.console()
-
-                cat("(12/12) End of Buffer:",rad,"   Preparing next radius\n")
-                flush.console()
-                flag_while_buff <- nrow(diff_out) > 0
-
-            rad <- rad * 2
 
 
         }
         cat("\n** End of country:",code_cntry,"\n")
         diff <- rbind(diff,diff_cntry)
         cat("** Save to", fileRDS)
-         saveRDS(diff,fileRDS)
+        saveRDS(diff,fileRDS)
         cat("   DONE!\n")
         current <- Sys.time()
 
         duration <- current-start
 
-        reste <- duration/i * (nb_cntry-i)
-
-
-        vecUnits <- c("secs", "mins", "hours","days", "weeks")
-        i_units <- which(vecUnits == units(reste))
-
-        if(i_units < 5) {
-            reste2 <- reste
-            units(reste2) <- vecUnits[i_units + 1]
-
-            while(i_units < 4 & reste2 > 1) {
-                reste <- reste2
-                i_units <- which(vecUnits == units(reste))
-                reste2 <- reste
-                units(reste2) <- vecUnits[i_units + 1]
-            }
-            if(reste2 > 1) reste <- reste2
-        }
+        reste <- time_estimation(i,nb_cntry,start,current)
 
         cat("\n[",i,"/",nb_cntry,"]  |--> Elapsed time: ",round(duration,1)," ",attr(duration,"units"),"   -->|  Estimated time: ",round(reste,1)," ",attr(reste,"units"),"\n",sep="")
         flush.console()
@@ -450,12 +444,22 @@ coast2country <- function(id=NULL,monde_simple=NULL,monde,diffprecision,tdwg,vec
 if (exemple) {
     load("data/workspace_260220.Rdata")
     load("data/tmp_diffprecision.RData")
+    load("data/country_pacislands.Rdata")
     monde_simple <- readRDS("data/monde_simple.rds")
-  #  d_diff<- coast2country(monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=c("FRA","ARG"))
+    ##  d_diff<- coast2country(monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=c("FRA","ARG"))
 
-  ##  d_diff<- coast2country(id="test30",monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=30,i_end=NULL)
+    ##  d_diff<- coast2country(id="test30",monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=30,i_end=NULL)
 
-d_diff<- coast2country(id=NULL,monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=NULL,i_start=1,i_end=3)
+    ##d_diff<- coast2country(id=100,monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=,i_start=100,i_end=NULL)
+
+    ## d_diff<- coast2country(id="mex",monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry="MEX",i_start=NULL,i_end=NULL)
+
+    country_pacislands <- sort(country_pacislands)
+    print(country_pacislands)
+
+    d_diff<- coast2country(id="country_pacislands",monde_simple=monde_simple,monde=monde,diffprecision=diffprecision,tdwg=tdwg,vec_cntry=country_pacislands,i_start=NULL,i_end=NULL)
+
+
 
 }
 
