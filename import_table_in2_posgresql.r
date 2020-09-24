@@ -52,7 +52,7 @@ myshell <- function(mycmd,myinvisible=TRUE) {
 #' @param rawEncoding encoding of raw data file, default value : UTF-8
 #' @param pathData directory of data
 #' @param pathSQL directory of sql file that will maked by the script (this directory need to be exist)
-#' @param doChangeChar bolean value if you need to change some character directly in the raw file before the importation. This process could during a long time, so use it only if necessary, default FALSE
+#' @param doChangeChar bolean value if you need to change some character directly in the raw file before the importation. This process could be long, so use it only if necessary, default FALSE
 #' @param changeCharInRaw a list of pairs of character change in the raw file
 #' For exemple:
 #'      list(c("\\\\\\\\\"\"",""),c("\\\",\\\"","\\\";\\\""),c(","," "),c("\"\"",""),c(","," "),c("\"\"",""),c("\'\'"," "))
@@ -85,6 +85,8 @@ myshell <- function(mycmd,myinvisible=TRUE) {
 #' @export
 #'
 #' @examples psql_import_table(file="amphi.csv",doChangeChar=TRUE,changeCharInRaw=c(c(",","_"),changeColNames=c("collaborative_australian_protected_areas_database__capad__marine_2010"="capad__marine_2010","collaborative_australian_protected_areas_database__capad__marine_2010_1"="capad__marine_2010_1"),dbname="harmony",tableName="amphibians",pkField="record_id",realField=c("decimallongitude","decimallatitude"),createGeom=TRUE,geom.lonlat=c("decimallongitude","decimallatitude"))
+#'
+#'
 psql_import_table <- function(file,
                               vecSep=c("\t",";",","),rawEncoding="UTF-8",
                               pathData="rawData",pathSQL= "sql",
@@ -248,7 +250,7 @@ psql_import_table <- function(file,
     if(nchar(create)>1000) cat(substr(create,1,500),"\n[...CREATE query to long to be enterely showed...]\n",substr(create,nchar(create)-50,nchar(create)),"\n") else cat(create,"\n")
     cat(create,file=fileSQL.path,append=TRUE)
 
-    copyQuery <- paste("\n\n\ \\copy ",tableName,ifelse(!is.null(excludedColumn),paste("(",paste(h,collapse=","),")",sep=""),"")," FROM '",pathFile,"' with (format csv, header, delimiter '",theSeparator,"', null '')\n",sep="")#,ESCAPE '\"',ENCODING '",rawEncoding," ,QUOTE E'\\b'
+    copyQuery <- paste0("\n\n\ \\copy ",tableName,ifelse(!is.null(excludedColumn),paste0("(",paste(h,collapse=","),")"),"")," FROM '",pathFile,"' with (format csv, header, delimiter '",theSeparator,"',",ifelse(!is.null(rawEncoding),paste0(" ENCODING '",rawEncoding,"' "),""),", null '')\n")#,ESCAPE '\"',ENCODING '",rawEncoding," ,QUOTE E'\\b'
     cat(copyQuery)
     cat(copyQuery,file=fileSQL.path,append=TRUE)
 
