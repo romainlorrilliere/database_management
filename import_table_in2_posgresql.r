@@ -108,10 +108,10 @@ psql_import_table <- function(file,
 
 
     ## ---- initializing of an example set of parameters for debugging ----
-    ## file="aaa.csv"
-    ## pathSQL= "sql/"; fileSQL= "_postgres_import_data.sql";   tableName= "ala"
-    ## pkField="a";realField="d";intField="e";booleanField=NULL
-    ## tableName;toDoLiteTable=FALSE;litetableName="alalite";keepedCol=c("a","d","e","f");colType=NULL;
+    ## file="FR_species.txt"
+    ## pathSQL= "sql/"; fileSQL= "_postgres_import_data.sql";   tableName= "fr_species"
+    ## pkField="pk_fr";realField=NULL;intField=NULL;booleanField=NULL;vecIndex="esp"
+    ## toDoLiteTable=FALSE;litetableName="alalite";keepedCol=NULL;colType=NULL;
     ## geomName="geom";epsgRaw=NULL;epsgGeom=NULL;geom.lonlat=c("lon","lat")
     ## dbname="bullshit"
     ## -------------------------------------------------------
@@ -278,7 +278,7 @@ psql_import_table <- function(file,
 
 
     if(!is.null(vecIndex)){
-        query <- paste("\n",paste("CREATE INDEX index_",vecIndex," ON ",ifelse(toDoLiteTable,litetableName,tableName),"(vecIndex);\n",sep=""),collapse="")
+        query <- paste("\n",paste("CREATE INDEX index_",vecIndex," ON ",ifelse(toDoLiteTable,litetableName,tableName),"(",vecIndex,");\n",sep=""),collapse="")
         cat(query)
         cat("\n",query,file=fileSQL.path,append=TRUE)
     }
